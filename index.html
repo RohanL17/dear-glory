@@ -33,7 +33,7 @@
     --wobble:255px 18px 225px 18px / 18px 225px 18px 255px;
   }
   *{box-sizing:border-box}
-  html{scroll-snap-type:y proximity}
+  html{scroll-behavior:smooth}
   body{
     margin:0;
     background:var(--paper);
@@ -87,7 +87,6 @@
     text-align:center;
     padding:40px 20px;
     overflow:hidden;
-    scroll-snap-align:start;
   }
   .layer{position:absolute;inset:-8%;pointer-events:none;will-change:transform}
   .heart{position:absolute;width:26px;height:26px;opacity:.75;animation:float 7s ease-in-out infinite}
@@ -119,7 +118,6 @@
     display:flex;flex-direction:column;align-items:center;justify-content:center;
     gap:26px;
     padding:64px 20px 88px;
-    scroll-snap-align:start;
   }
   .scene::before{
     content:"";position:absolute;inset:0;pointer-events:none;
@@ -728,6 +726,15 @@
     else { fadeTo(0, 600); setTimeout(function(){ bgm.pause(); }, 620); setMusicUI(false); }
   });
 
+  /* scroll so a section's top meets the top of the screen; waits two frames so the
+     freshly un-hidden content has been laid out before we measure it */
+  function scrollToEl(el){
+    requestAnimationFrame(function(){ requestAnimationFrame(function(){
+      var top = el.getBoundingClientRect().top + window.pageYOffset;
+      window.scrollTo({top: top, behavior: reduce ? 'auto' : 'smooth'});
+    }); });
+  }
+
   /* scene entrance for any group of scenes */
   function reveal(scenes){
     if (reduce || !('IntersectionObserver' in window)) return;
@@ -777,9 +784,7 @@
       }, {threshold: .55});
       storyScenes.forEach(function(s){ active.observe(s); });
     }
-    requestAnimationFrame(function(){
-      storyScenes[0].scrollIntoView({behavior: reduce ? 'auto' : 'smooth', block: 'start'});
-    });
+    scrollToEl(storyScenes[0]);
   }
   openBtn.addEventListener('click', openStory);
 
@@ -795,9 +800,7 @@
       }, {threshold: 0.01});
       pio.observe(proposal);
     }
-    requestAnimationFrame(function(){
-      proposalScenes[0].scrollIntoView({behavior: reduce ? 'auto' : 'smooth', block: 'start'});
-    });
+    scrollToEl(proposalScenes[0]);
   }
   continueBtn.addEventListener('click', openProposal);
 
