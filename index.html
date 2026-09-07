@@ -715,14 +715,18 @@
     document.removeEventListener('pointerdown', primeOnce);
   }, {passive: true});
 
+  /* Volume fade on a plain timer (not animation frames, which a busy or backgrounded phone can
+     stall), with a final hard set so the target volume is always reached. */
+  var fadeTimer = null, fadeGuard = null;
   function fadeTo(target, ms){
-    var from = bgm.volume, start = performance.now();
-    function f(now){
-      var t = Math.min(1, (now - start) / ms);
+    clearInterval(fadeTimer); clearTimeout(fadeGuard);
+    var from = bgm.volume, start = Date.now();
+    fadeTimer = setInterval(function(){
+      var t = Math.min(1, (Date.now() - start) / ms);
       try { bgm.volume = from + (target - from) * t; } catch (e) {}
-      if (t < 1) requestAnimationFrame(f);
-    }
-    requestAnimationFrame(f);
+      if (t >= 1) clearInterval(fadeTimer);
+    }, 50);
+    fadeGuard = setTimeout(function(){ clearInterval(fadeTimer); try { bgm.volume = target; } catch (e) {} }, ms + 300);
   }
   function setMusicUI(on){
     musicBtn.hidden = false;
@@ -732,7 +736,7 @@
   function reallyPlaying(){ return !bgm.paused && !bgm.ended && bgm.currentTime > 0.05; }
 
   function tryPlay(){
-    try { bgm.volume = 0; } catch (e) {}
+    try { if (bgm.volume < 0.3) bgm.volume = 0.3; } catch (e) {}
     var p = bgm.play();
     if (p && p.catch) p.catch(function(){});
   }
