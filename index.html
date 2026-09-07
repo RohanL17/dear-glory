@@ -697,38 +697,72 @@
     }
   }
 
-  /* background music: starts on the "open our story" tap (a real user gesture), fades in, loops */
+  /* background music: starts on the "open our story" tap (a real user gesture), fades in, loops.
+     Some phones report play() as started before any sound comes out, so we verify that the
+     clock is actually advancing and retry a few times; if it still isn't playing, the button
+     is shown in the "off" state so ONE tap starts it. */
   var bgm = document.getElementById('bgm');
   var musicBtn = document.getElementById('musicBtn');
   var TARGET_VOL = 0.55;
+  var musicWanted = false;
   bgm.loop = true;
-  /* belt and braces: if a browser ignores `loop` on embedded audio, restart it ourselves */
+  bgm.muted = false;
   bgm.addEventListener('ended', function(){ bgm.currentTime = 0; bgm.play().catch(function(){}); });
+  /* warm up decoding of the embedded track as early as possible */
+  try { bgm.load(); } catch (e) {}
+  document.addEventListener('pointerdown', function primeOnce(){
+    try { bgm.load(); } catch (e) {}
+    document.removeEventListener('pointerdown', primeOnce);
+  }, {passive: true});
+
   function fadeTo(target, ms){
     var from = bgm.volume, start = performance.now();
     function f(now){
       var t = Math.min(1, (now - start) / ms);
-      bgm.volume = from + (target - from) * t;
+      try { bgm.volume = from + (target - from) * t; } catch (e) {}
       if (t < 1) requestAnimationFrame(f);
     }
     requestAnimationFrame(f);
   }
-  function startMusic(){
-    bgm.volume = 0;
-    var p = bgm.play();
-    if (p && p.then) {
-      p.then(function(){ musicBtn.hidden = false; fadeTo(TARGET_VOL, 2500); })
-       .catch(function(){ /* browser refused autoplay: show the button so she can start it herself */
-         musicBtn.hidden = false; setMusicUI(false); });
-    } else { musicBtn.hidden = false; fadeTo(TARGET_VOL, 2500); }
-  }
   function setMusicUI(on){
+    musicBtn.hidden = false;
     musicBtn.setAttribute('aria-pressed', on ? 'true' : 'false');
     musicBtn.setAttribute('aria-label', on ? 'Music on — tap to mute' : 'Music off — tap to play');
   }
+  function reallyPlaying(){ return !bgm.paused && !bgm.ended && bgm.currentTime > 0.05; }
+
+  function tryPlay(){
+    try { bgm.volume = 0; } catch (e) {}
+    var p = bgm.play();
+    if (p && p.catch) p.catch(function(){});
+  }
+  function startMusic(){
+    musicWanted = true;
+    tryPlay();                        /* synchronous, inside the tap handler */
+    var attempts = 0;
+    function check(){
+      if (!musicWanted) return;
+      if (reallyPlaying()) { setMusicUI(true); fadeTo(TARGET_VOL, 2200); return; }
+      if (attempts++ < 6) { tryPlay(); setTimeout(check, 500); }
+      else { setMusicUI(false); }     /* honest state: one tap will start it */
+    }
+    setTimeout(check, 400);
+  }
+  bgm.addEventListener('playing', function(){
+    if (musicWanted && musicBtn.getAttribute('aria-pressed') !== 'true') { setMusicUI(true); fadeTo(TARGET_VOL, 1500); }
+  });
+
   musicBtn.addEventListener('click', function(){
-    if (bgm.paused) { bgm.volume = 0; bgm.play().then(function(){ fadeTo(TARGET_VOL, 1200); setMusicUI(true); }).catch(function(){}); }
-    else { fadeTo(0, 600); setTimeout(function(){ bgm.pause(); }, 620); setMusicUI(false); }
+    if (bgm.paused) {
+      musicWanted = true;
+      tryPlay();
+      setTimeout(function(){ if (reallyPlaying()) { setMusicUI(true); fadeTo(TARGET_VOL, 1200); } }, 300);
+    } else {
+      musicWanted = false;
+      fadeTo(0, 600);
+      setTimeout(function(){ bgm.pause(); }, 620);
+      setMusicUI(false);
+    }
   });
 
   /* scroll so a section's top meets the top of the screen. Reading the rect forces layout
