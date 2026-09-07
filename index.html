@@ -726,13 +726,11 @@
     else { fadeTo(0, 600); setTimeout(function(){ bgm.pause(); }, 620); setMusicUI(false); }
   });
 
-  /* scroll so a section's top meets the top of the screen; waits two frames so the
-     freshly un-hidden content has been laid out before we measure it */
+  /* scroll so a section's top meets the top of the screen. Reading the rect forces layout
+     of the freshly un-hidden content, so this is safe to call right after un-hiding. */
   function scrollToEl(el){
-    requestAnimationFrame(function(){ requestAnimationFrame(function(){
-      var top = el.getBoundingClientRect().top + window.pageYOffset;
-      window.scrollTo({top: top, behavior: reduce ? 'auto' : 'smooth'});
-    }); });
+    var top = el.getBoundingClientRect().top + window.pageYOffset;
+    window.scrollTo({top: top, behavior: reduce ? 'auto' : 'smooth'});
   }
 
   /* scene entrance for any group of scenes */
